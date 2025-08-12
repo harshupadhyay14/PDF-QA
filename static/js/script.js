@@ -4,9 +4,9 @@ document.getElementById("qaForm").addEventListener("submit", async (e) => {
     const formData = new FormData(e.target);
 
     try {
-        const res = await fetch("/qa", {
-            method: "GET",
-            body: formData
+        const res = await fetch("/ask", {
+            method: "POST",
+            body: formData,
         });
 
         if (!res.ok) throw new Error("Server error while getting answer.");
@@ -23,15 +23,18 @@ document.getElementById("summaryForm").addEventListener("submit", async (e) => {
     const url = e.target.url.value;
 
     try {
-        const res = await fetch("/summarize", {
+        const formData = new FormData();
+        formData.append("url", url);
+
+        const res = await fetch("/ask", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url })
+            body: formData,
         });
 
         if (!res.ok) throw new Error("Server error while summarizing.");
         const data = await res.json();
-        document.getElementById("summaryResult").textContent = data.summary || "No summary found.";
+        // The /ask route returns { answer } for both QA and summarization
+        document.getElementById("summaryResult").textContent = data.answer || "No summary found.";
     } catch (err) {
         document.getElementById("summaryResult").textContent = "❌ " + err.message;
     }

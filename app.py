@@ -8,6 +8,13 @@ import docx
 import requests
 from groq import Groq
 
+# Try to import PyMuPDF as fallback
+try:
+    import fitz  # PyMuPDF
+    PYMUPDF_AVAILABLE = True
+except ImportError:
+    PYMUPDF_AVAILABLE = False
+
 # ------------------------
 # Flask Setup
 # ------------------------
@@ -21,6 +28,7 @@ app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB limit
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+
 if not GROQ_API_KEY:
     raise RuntimeError("GROQ_API_KEY not set in environment variables!")
 
@@ -31,13 +39,39 @@ client = Groq(api_key=GROQ_API_KEY)
 # ------------------------
 def extract_text_from_pdf(file_path):
     text = ""
+    
+    # Try PyMuPDF first (more robust)
+    if PYMUPDF_AVAILABLE:
+        try:
+            doc = fitz.open(file_path)
+            for page_num in range(len(doc)):
+                page = doc.load_page(page_num)
+                text += page.get_text()
+                # Limit to prevent excessive processing
+                if len(text) > 10000:
+                    break
+            doc.close()
+            return text.strip()
+        except Exception as e:
+            print(f"PyMuPDF extraction failed: {e}, trying PyPDF2...")
+    
+    # Fallback to PyPDF2
     try:
         with open(file_path, "rb") as f:
             reader = PdfReader(f)
-            for page in reader.pages:
-                text += page.extract_text() or ""
+            # Add timeout protection and better error handling
+            for i, page in enumerate(reader.pages):
+                try:
+                    page_text = page.extract_text() or ""
+                    text += page_text
+                    # Limit to prevent excessive processing
+                    if len(text) > 10000:  # Limit to 10k characters
+                        break
+                except Exception as page_error:
+                    print(f"Warning: Failed to extract text from page {i}: {page_error}")
+                    continue
     except Exception as e:
-        raise RuntimeError(f"PDF extraction failed: {e}")
+        raise RuntimeError(f"PDF extraction failed with both PyMuPDF and PyPDF2: {e}")
     return text.strip()
 
 def extract_text_from_docx(file_path):
@@ -128,7 +162,11 @@ def ask():
         return jsonify({"error": "No file or URL provided."}), 400
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Log the error for debugging
+        print(f"ERROR in /ask route: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "An error occurred while processing your request. Please try again."}), 500
     
 @app.route("/qa", methods=["POST"])
 def qa():

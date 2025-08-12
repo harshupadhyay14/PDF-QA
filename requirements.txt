@@ -1,6 +1,7 @@
 Flask
 python-docx
 PyMuPDF
+PyPDF2
 requests
 beautifulsoup4
 groq
