@@ -1,0 +1,7 @@
+Flask
+python-docx
+PyMuPDF
+requests
+beautifulsoup4
+groq
+python-dotenv
